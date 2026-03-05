@@ -1,0 +1,60 @@
+name: OIDC Token Test
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  oidc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: OIDC Token Analysis
+        run: |
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN length: ${#ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
+          echo ""
+          
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "NO OIDC URL AVAILABLE"
+            exit 0
+          fi
+          
+          # Request with different audiences
+          for aud in "api://AzureADTokenExchange" "https://management.azure.com" "https://github.com" "https://token.actions.githubusercontent.com" "sts.amazonaws.com" "*" ""; do
+            echo "=== Audience: '$aud' ==="
+            if [ -n "$aud" ]; then
+              URL="$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$aud"
+            else
+              URL="$ACTIONS_ID_TOKEN_REQUEST_URL"
+            fi
+            RESP=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$URL")
+            echo "$RESP" | head -3
+            echo ""
+            
+            # Decode JWT payload
+            TOKEN=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('value',''))" 2>/dev/null)
+            if [ -n "$TOKEN" ]; then
+              echo "JWT Claims:"
+              echo "$TOKEN" | cut -d. -f2 | python3 -c "
+import sys, base64, json
+b = sys.stdin.read().strip()
+b += '=' * (4 - len(b) % 4)
+try:
+    d = json.loads(base64.b64decode(b))
+    for k,v in d.items():
+        print(f'  {k}: {v}')
+except: pass
+" 2>/dev/null
+              echo ""
+            fi
+          done
+          
+          # Check env for any tokens
+          echo "=== Token-like env vars ==="
+          env | grep -iE 'TOKEN|SECRET|KEY|AUTH|CRED' | while read line; do
+            VAR=$(echo "$line" | cut -d= -f1)
+            VAL=$(echo "$line" | cut -d= -f2-)
+            echo "  $VAR = [${#VAL} chars]"
+          done
