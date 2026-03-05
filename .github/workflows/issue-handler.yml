@@ -1,0 +1,13 @@
+name: PR Handler (Vulnerable Pattern)
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  handle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process issue
+        run: |
+          echo "Processing issue: ${{ github.event.issue.title }}"
+          echo "Body: ${{ github.event.issue.body }}"
